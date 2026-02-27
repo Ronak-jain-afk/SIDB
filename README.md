@@ -2,7 +2,7 @@
 
 An External Attack Surface Management (EASM) platform that discovers, analyzes, and visualizes publicly exposed organizational assets.
 
-![Dashboard Preview](docs/dashboard-preview.png)
+![Dashboard Preview](dashboard-preview.png)
 
 ## Features
 
