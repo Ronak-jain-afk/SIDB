@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow IT Discovery Bot - Security Dashboard</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Custom Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            dark: '#0a0f1a',
+                            darker: '#060b14',
+                            card: '#111827',
+                            border: '#1f2937',
+                            accent: '#06b6d4',
+                            glow: '#22d3ee'
+                        },
+                        risk: {
+                            critical: '#ef4444',
+                            high: '#f97316',
+                            medium: '#eab308',
+                            low: '#22c55e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/custom.css">
+</head>
+<body class="bg-cyber-dark text-gray-100 min-h-screen">
+    
+    <!-- Main Container -->
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        
+        <!-- Header -->
+        <header class="mb-8">
+            <div class="flex items-center justify-center">
+                <!-- Logo & Title -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-white">Shadow IT Discovery Bot</h1>
+                        <p class="text-sm text-gray-400">External Attack Surface Management</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Progress Bar (Hidden by default) -->
+        <div id="progress-section" class="hidden mb-8">
+            <div class="bg-cyber-card rounded-lg border border-cyber-border p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="progress-text" class="text-sm text-gray-400">Initializing scan...</span>
+                    <span id="progress-status" class="text-xs px-2 py-1 bg-cyan-900/50 text-cyan-400 rounded">PENDING</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2">
+                    <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dashboard Content (Hidden until scan completes) -->
+        <div id="dashboard-content" class="hidden">
+            
+            <!-- Top Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                
+                <!-- Security Posture Score -->
+                <div class="bg-cyber-card rounded-xl border border-cyber-border p-6 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-bl-full"></div>
+                    <h3 class="text-sm font-medium text-gray-400 mb-4">Security Posture</h3>
+                    <div class="flex items-center gap-4">
+                        <div class="relative w-24 h-24">
+                            <canvas id="posture-gauge"></canvas>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span id="posture-score" class="text-3xl font-bold text-white">--</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p id="posture-rating" class="text-lg font-semibold text-gray-300">--</p>
+                            <p id="posture-summary" class="text-xs text-gray-500 mt-1 max-w-[150px]">Run a scan to see results</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Severity Distribution -->
+                <div class="bg-cyber-card rounded-xl border border-cyber-border p-6">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4">Severity Distribution</h3>
+                    <div class="h-32">
+                        <canvas id="severity-chart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Quick Stats -->
+                <div class="bg-cyber-card rounded-xl border border-cyber-border p-6">
+                    <h3 class="text-sm font-medium text-gray-400 mb-4">Discovery Summary</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center p-3 bg-gray-800/50 rounded-lg">
+                            <p id="stat-total" class="text-2xl font-bold text-white">0</p>
+                            <p class="text-xs text-gray-500">Total Assets</p>
+                        </div>
+                        <div class="text-center p-3 bg-red-900/20 rounded-lg border border-red-900/30">
+                            <p id="stat-critical" class="text-2xl font-bold text-risk-critical">0</p>
+                            <p class="text-xs text-gray-500">Critical</p>
+                        </div>
+                        <div class="text-center p-3 bg-orange-900/20 rounded-lg border border-orange-900/30">
+                            <p id="stat-high" class="text-2xl font-bold text-risk-high">0</p>
+                            <p class="text-xs text-gray-500">High Risk</p>
+                        </div>
+                        <div class="text-center p-3 bg-yellow-900/20 rounded-lg border border-yellow-900/30">
+                            <p id="stat-medium" class="text-2xl font-bold text-risk-medium">0</p>
+                            <p class="text-xs text-gray-500">Medium</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Assets Table -->
+            <div class="bg-cyber-card rounded-xl border border-cyber-border mb-8">
+                <div class="p-4 border-b border-cyber-border flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-white">Discovered Assets</h3>
+                    <div class="flex items-center gap-2">
+                        <select id="risk-filter" class="px-3 py-1.5 bg-gray-800 border border-cyber-border rounded text-sm text-gray-300 focus:outline-none focus:border-cyber-accent">
+                            <option value="all">All Risks</option>
+                            <option value="Critical">Critical</option>
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-800/50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Asset ID</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">IP Address</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Port</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Service</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Technology</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Risk Level</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assets-table-body" class="divide-y divide-cyber-border">
+                            <!-- Assets will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="no-assets" class="hidden p-8 text-center text-gray-500">
+                    No assets found matching the filter.
+                </div>
+            </div>
+            
+            <!-- Recommendations Section -->
+            <div class="bg-cyber-card rounded-xl border border-cyber-border">
+                <div class="p-4 border-b border-cyber-border">
+                    <h3 class="text-lg font-semibold text-white">Remediation Recommendations</h3>
+                    <p class="text-sm text-gray-400 mt-1">Prioritized actions to reduce your attack surface</p>
+                </div>
+                <div id="recommendations-container" class="divide-y divide-cyber-border">
+                    <!-- Recommendations will be populated here -->
+                </div>
+                <div id="no-recommendations" class="hidden p-8 text-center text-gray-500">
+                    No recommendations available.
+                </div>
+            </div>
+        </div>
+        
+        <!-- Empty State (Shown before scan) -->
+        <div id="empty-state" class="flex flex-col items-center justify-center py-20">
+            <div class="w-24 h-24 bg-gradient-to-br from-cyan-500/20 to-blue-600/20 rounded-full flex items-center justify-center mb-6">
+                <svg class="w-12 h-12 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-white mb-2">Start Your Security Assessment</h2>
+            <p class="text-gray-400 text-center max-w-md mb-8">
+                Discover exposed assets, analyze security risks, and get actionable remediation recommendations.
+            </p>
+            
+            <!-- Centered Scan Form -->
+            <form id="scan-form" class="flex flex-col items-center gap-4 mb-8">
+                <div class="flex gap-3">
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="domain-input"
+                            placeholder="Enter domain (e.g., example.com)"
+                            class="w-80 px-5 py-3 bg-cyber-card border border-cyber-border rounded-xl focus:outline-none focus:border-cyber-accent focus:ring-2 focus:ring-cyber-accent/50 text-white placeholder-gray-500 text-lg"
+                            required
+                        >
+                    </div>
+                    <button 
+                        type="submit"
+                        id="scan-button"
+                        class="px-8 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg shadow-cyan-500/25"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <span>Scan</span>
+                    </button>
+                </div>
+                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                    <input type="checkbox" id="network-scan-toggle" class="w-4 h-4 rounded bg-cyber-card border-cyber-border text-cyber-accent focus:ring-cyber-accent">
+                    <span>Enable Network Scan (active port scanning)</span>
+                </label>
+            </form>
+            
+            <div class="flex items-center gap-8 text-sm text-gray-500">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span>Asset Discovery</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span>Risk Analysis</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <span>Remediation</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Error State (Hidden by default) -->
+        <div id="error-state" class="hidden flex flex-col items-center justify-center py-20">
+            <div class="w-24 h-24 bg-red-500/20 rounded-full flex items-center justify-center mb-6">
+                <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-white mb-2">Scan Failed</h2>
+            <p id="error-message" class="text-gray-400 text-center max-w-md mb-6">
+                An error occurred while scanning. Please try again.
+            </p>
+            <button id="retry-button" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors">
+                Try Again
+            </button>
+        </div>
+        
+        <!-- Footer -->
+        <footer class="mt-12 pt-6 border-t border-cyber-border text-center text-sm text-gray-500">
+            <p>Shadow IT Discovery Bot &mdash; External Attack Surface Management Platform</p>
+            <p class="mt-1">This is a demo/hackathon project. Not for production use.</p>
+        </footer>
+    </div>
+    
+    <!-- JavaScript Modules -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

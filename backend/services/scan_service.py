@@ -1,0 +1,202 @@
+"""
+Scan Service for Shadow IT Discovery Bot.
+Orchestrates the entire scan workflow as a background task.
+"""
+
+import asyncio
+import uuid
+from datetime import datetime
+from typing import Optional
+
+from models import ScanResult, ScanStatus
+from storage import get_database
+from discovery import get_discovery
+from analysis import get_risk_engine
+from intelligence import get_recommendation_engine
+from utils import calculate_posture_score
+
+
+class ScanService:
+    """
+    Orchestrates the scan workflow.
+    
+    Workflow:
+    1. Create initial scan record
+    2. Discover assets (Shodan or mock)
+    3. Analyze risk for each asset
+    4. Generate recommendations
+    5. Calculate security posture
+    6. Save final results
+    
+    Each step updates the scan status for polling.
+    """
+    
+    def __init__(self):
+        self.db = get_database()
+        self.discovery = get_discovery()
+        self.risk_engine = get_risk_engine()
+        self.recommendation_engine = get_recommendation_engine()
+    
+    async def create_scan(self, domain: str) -> ScanResult:
+        """
+        Initialize a new scan record.
+        
+        Creates a pending scan with unique ID for tracking.
+        
+        Args:
+            domain: Target domain to scan
+            
+        Returns:
+            Initial ScanResult with pending status
+        """
+        scan_id = f"SCAN-{uuid.uuid4().hex[:12].upper()}"
+        
+        scan = ScanResult(
+            scan_id=scan_id,
+            domain=domain,
+            status=ScanStatus.PENDING,
+            started_at=datetime.utcnow(),
+            assets=[],
+            recommendations=[],
+            posture_score=None
+        )
+        
+        await self.db.save_scan(scan)
+        return scan
+    
+    async def run_scan(
+        self, 
+        scan_id: str, 
+        domain: str,
+        enable_network_scan: bool = False
+    ) -> None:
+        """
+        Execute the full scan workflow as background task.
+        
+        This is called after the API returns to the client,
+        allowing async scan completion with status polling.
+        
+        Args:
+            scan_id: Scan identifier for tracking
+            domain: Target domain to scan
+            enable_network_scan: Enable active network scanning
+        """
+        try:
+            # ======= PHASE 1: SCANNING =======
+            print(f"[{scan_id}] Starting asset discovery for {domain}")
+            if enable_network_scan:
+                print(f"[{scan_id}] Network scanning enabled")
+            await self._update_status(scan_id, ScanStatus.SCANNING)
+            
+            # Add small delay for realistic demo feel
+            await asyncio.sleep(1)
+            
+            # Discover assets (with optional network scan)
+            assets = await self.discovery.discover_assets(
+                domain,
+                use_network_scan=enable_network_scan
+            )
+            print(f"[{scan_id}] Discovered {len(assets)} assets")
+            
+            # ======= PHASE 2: ANALYZING =======
+            print(f"[{scan_id}] Analyzing risks")
+            await self._update_status(scan_id, ScanStatus.ANALYZING)
+            
+            await asyncio.sleep(0.5)
+            
+            # Analyze each asset
+            analyzed_assets = self.risk_engine.analyze_assets(assets)
+            
+            # Generate recommendations
+            recommendations = self.recommendation_engine.generate_recommendations(
+                analyzed_assets
+            )
+            print(f"[{scan_id}] Generated {len(recommendations)} recommendations")
+            
+            # Calculate posture score
+            posture_score = calculate_posture_score(analyzed_assets)
+            print(f"[{scan_id}] Security posture: {posture_score.score}/100 ({posture_score.rating.value})")
+            
+            # ======= PHASE 3: COMPLETING =======
+            scan = await self.db.get_scan(scan_id)
+            if scan:
+                scan.assets = analyzed_assets
+                scan.recommendations = recommendations
+                scan.posture_score = posture_score
+                scan.status = ScanStatus.COMPLETED
+                scan.completed_at = datetime.utcnow()
+                
+                await self.db.save_scan(scan)
+                print(f"[{scan_id}] Scan completed successfully")
+            
+        except Exception as e:
+            print(f"[{scan_id}] Scan failed: {e}")
+            await self._update_status(
+                scan_id, 
+                ScanStatus.FAILED, 
+                error_message=str(e)
+            )
+    
+    async def get_scan(self, scan_id: str) -> Optional[ScanResult]:
+        """
+        Retrieve scan results by ID.
+        
+        Args:
+            scan_id: Scan identifier
+            
+        Returns:
+            ScanResult if found, None otherwise
+        """
+        return await self.db.get_scan(scan_id)
+    
+    async def get_scan_status(self, scan_id: str) -> Optional[dict]:
+        """
+        Get current scan status for polling.
+        
+        Args:
+            scan_id: Scan identifier
+            
+        Returns:
+            Status dict or None if not found
+        """
+        scan = await self.db.get_scan(scan_id)
+        if not scan:
+            return None
+        
+        # Map status to progress message
+        progress_messages = {
+            ScanStatus.PENDING: "Initializing scan...",
+            ScanStatus.SCANNING: "Discovering assets...",
+            ScanStatus.ANALYZING: "Analyzing risks and generating recommendations...",
+            ScanStatus.COMPLETED: "Scan complete",
+            ScanStatus.FAILED: "Scan failed"
+        }
+        
+        return {
+            "scan_id": scan.scan_id,
+            "status": scan.status,
+            "progress": progress_messages.get(scan.status, "Unknown"),
+            "started_at": scan.started_at,
+            "completed_at": scan.completed_at
+        }
+    
+    async def _update_status(
+        self, 
+        scan_id: str, 
+        status: ScanStatus,
+        error_message: Optional[str] = None
+    ) -> None:
+        """Update scan status in database."""
+        await self.db.update_scan_status(scan_id, status, error_message)
+
+
+# Singleton instance
+_service_instance: Optional[ScanService] = None
+
+
+def get_scan_service() -> ScanService:
+    """Get or create the scan service singleton."""
+    global _service_instance
+    if _service_instance is None:
+        _service_instance = ScanService()
+    return _service_instance
