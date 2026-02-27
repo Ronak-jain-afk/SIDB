@@ -191,3 +191,5 @@ MIT License - See [LICENSE](LICENSE) for details.
 - [FastAPI](https://fastapi.tiangolo.com) - Modern Python web framework
 - [Tailwind CSS](https://tailwindcss.com) - Utility-first CSS framework
 - [Chart.js](https://chartjs.org) - JavaScript charting library
+
+> **Note:** This README and code documentation were generated with assistance from AI.
