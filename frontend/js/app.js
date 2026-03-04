@@ -2,7 +2,7 @@
  * Main application logic for Shadow IT Discovery Bot
  */
 
-const App = {
+const App = {   
     // Current state
     state: {
         scanning: false,

@@ -109,7 +109,8 @@ class AssetDiscovery:
         timeout: float = 1.0
     ) -> List[Asset]:
         """
-        Discover assets using network scanning.
+        Discover assets using network 
+        scanning.
         
         WARNING: Only scan networks you own or have permission to test.
         
