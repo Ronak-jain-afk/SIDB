@@ -5,7 +5,6 @@ Handles discovery of internet-facing assets using Shodan API, network scanning, 
 
 import asyncio
 import json
-import uuid
 import httpx
 from typing import List, Optional
 from pathlib import Path
@@ -250,20 +249,16 @@ class AssetDiscovery:
         if version:
             technology = f"{technology} {version}"
         
-        # Check for SSL/TLS
-        ssl_info = port_info.get("ssl", {})
-        
         return Asset(
             asset_id=f"SHODAN-{domain.upper().replace('.', '-')}-{index:03d}",
-            domain=domain,
             ip=ip,
             port=port,
             service=service,
             technology=technology.strip() or "Unknown",
-            hostnames=host_data.get("hostnames", []),
-            banner=port_info.get("data", "")[:500],  # Truncate banner
-            ssl_cert=ssl_info.get("cert", {}).get("subject", {}).get("CN"),
-            risk_score=0,  # Will be calculated by risk engine
+            version=version or None,
+            hostname=(host_data.get("hostnames") or [None])[0],
+            exposure=ExposureLevel.PUBLIC,
+            risk_score=0,
             risk_level="Low"
         )
     
@@ -278,92 +273,6 @@ class AssetDiscovery:
             8443: "HTTPS-Alt", 27017: "MongoDB"
         }
         return port_services.get(port, f"Port-{port}")
-        """
-        Convert raw Shodan API response into normalized Asset object.
-        
-        This is critical for consistent downstream processing.
-        Shodan returns varied data structures depending on the service.
-        
-        Args:
-            shodan_match: Raw Shodan match object
-            index: Index for unique ID generation
-            
-        Returns:
-            Normalized Asset object
-        """
-        # Extract core fields with fallbacks
-        ip = shodan_match.get("ip_str", "Unknown")
-        port = shodan_match.get("port", 0)
-        
-        # Determine service from Shodan data
-        service = self._detect_service(shodan_match)
-        
-        # Extract technology/product info
-        product = shodan_match.get("product", None)
-        version = shodan_match.get("version", None)
-        
-        # Get hostname
-        hostnames = shodan_match.get("hostnames", [])
-        hostname = hostnames[0] if hostnames else None
-        
-        return Asset(
-            asset_id=f"SHODAN-{uuid.uuid4().hex[:8].upper()}",
-            ip=ip,
-            port=port,
-            service=service,
-            technology=product,
-            version=version,
-            hostname=hostname,
-            exposure=ExposureLevel.PUBLIC,  # Shodan only finds public assets
-            risk_level="Low",  # Will be calculated by risk engine
-            risk_score=0,
-            risk_factors=[]
-        )
-    
-    def _detect_service(self, shodan_match: dict) -> str:
-        """
-        Detect the service type from Shodan data.
-        
-        Shodan provides service info in various fields depending on the protocol.
-        
-        Args:
-            shodan_match: Raw Shodan match object
-            
-        Returns:
-            Service name string
-        """
-        # Check for explicit service field
-        if "product" in shodan_match:
-            return shodan_match["product"]
-        
-        # Map common ports to services
-        port = shodan_match.get("port", 0)
-        port_service_map = {
-            21: "FTP",
-            22: "SSH",
-            23: "Telnet",
-            25: "SMTP",
-            53: "DNS",
-            80: "HTTP",
-            110: "POP3",
-            143: "IMAP",
-            443: "HTTPS",
-            445: "SMB",
-            993: "IMAPS",
-            995: "POP3S",
-            1433: "MSSQL",
-            1521: "Oracle",
-            3306: "MySQL",
-            3389: "RDP",
-            5432: "PostgreSQL",
-            5900: "VNC",
-            6379: "Redis",
-            8080: "HTTP-Proxy",
-            8443: "HTTPS-Alt",
-            27017: "MongoDB",
-        }
-        
-        return port_service_map.get(port, f"Unknown-{port}")
     
     async def _load_mock_assets(self, domain: str) -> List[Asset]:
         """
