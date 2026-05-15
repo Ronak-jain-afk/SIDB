@@ -169,27 +169,37 @@ const App = {
      * @param {Object} status - Status object with progress and status
      */
     updateProgress(status) {
-        const progress = status.progress || 0;
+        const statusText = status.status || 'pending';
+        
+        const progressMap = {
+            'pending': 5,
+            'scanning': 40,
+            'analyzing': 70,
+            'completed': 100,
+            'failed': 100
+        };
+        const progress = progressMap[statusText] || 0;
         this.elements.progressBar.style.width = `${progress}%`;
         
-        // Update status text
-        const statusText = status.status || 'pending';
-        this.elements.progressStatus.textContent = statusText.toUpperCase();
+        const textMap = {
+            'pending': 'Initializing scan...',
+            'scanning': 'Discovering assets...',
+            'analyzing': 'Analyzing risks and generating recommendations...',
+            'completed': 'Scan completed!',
+            'failed': 'Scan failed'
+        };
+        this.elements.progressText.textContent = textMap[statusText] || 'Unknown';
         
-        // Update status styling
+        this.elements.progressStatus.textContent = statusText.toUpperCase();
         this.elements.progressStatus.className = 'text-xs px-2 py-1 rounded';
-        if (statusText === 'running') {
-            this.elements.progressStatus.classList.add('bg-cyan-900/50', 'text-cyan-400');
-            this.elements.progressText.textContent = 'Discovering assets...';
-        } else if (statusText === 'completed') {
+        if (statusText === 'completed') {
             this.elements.progressStatus.classList.add('bg-green-900/50', 'text-green-400');
-            this.elements.progressText.textContent = 'Scan completed!';
         } else if (statusText === 'failed') {
             this.elements.progressStatus.classList.add('bg-red-900/50', 'text-red-400');
-            this.elements.progressText.textContent = 'Scan failed';
+        } else if (statusText === 'scanning' || statusText === 'analyzing') {
+            this.elements.progressStatus.classList.add('bg-cyan-900/50', 'text-cyan-400');
         } else {
             this.elements.progressStatus.classList.add('bg-gray-700', 'text-gray-300');
-            this.elements.progressText.textContent = 'Initializing scan...';
         }
     },
 
