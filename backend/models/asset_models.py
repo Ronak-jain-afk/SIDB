@@ -131,7 +131,12 @@ class PostureScore(BaseModel):
 
 class ScanRequest(BaseModel):
     """Request body for starting a new scan."""
-    domain: str = Field(..., min_length=3, description="Target domain to scan")
+    domain: str = Field(
+        ...,
+        min_length=3,
+        pattern=r"^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$",
+        description="Target domain to scan (e.g., example.com)"
+    )
     enable_network_scan: bool = Field(
         False, 
         description="Enable active network scanning (requires permission)"
