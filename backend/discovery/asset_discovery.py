@@ -168,7 +168,6 @@ class AssetDiscovery:
             print(f"[Shodan] Resolved {domain} to {ip_address}")
             
             # Step 2: Get host info using free /shodan/host/{ip} endpoint
-            await asyncio.sleep(1.0)  # Rate limit between calls
             wait_time = await self.rate_limiter.acquire("shodan")
             
             host_url = f"{self.SHODAN_BASE_URL}/shodan/host/{ip_address}"
