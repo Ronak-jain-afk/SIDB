@@ -135,7 +135,7 @@ class NetworkScanner:
         
         # Resolve hostname to IP
         try:
-            ip = socket.gethostbyname(target)
+            ip = await asyncio.to_thread(socket.gethostbyname, target)
         except socket.gaierror:
             print(f"Could not resolve hostname: {target}")
             return []
@@ -184,7 +184,7 @@ class NetworkScanner:
             full_host = f"{subdomain}.{domain}"
             try:
                 # Quick check if subdomain resolves
-                socket.gethostbyname(full_host)
+                await asyncio.to_thread(socket.gethostbyname, full_host)
                 # If it resolves, do a quick scan of common ports
                 sub_assets = await self.scan_target(
                     full_host,
