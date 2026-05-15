@@ -4,7 +4,7 @@
 
 const API = {
     // Backend URL - adjust port if needed
-    BASE_URL: 'http://localhost:8003/api',
+    BASE_URL: 'http://localhost:8000/api',
     
     // Poll interval for scan status (ms)
     POLL_INTERVAL: 2000,
