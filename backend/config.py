@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # CORS configuration
     cors_origins: str = "http://localhost:8000"  # Comma-separated origins
     
+    # API rate limiting
+    api_rate_limit: int = 60  # Max requests per minute
+    
     # Server configuration
     host: str = "0.0.0.0"
     port: int = 8000

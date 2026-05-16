@@ -3,9 +3,10 @@ Scan API Routes for Shadow IT Discovery Bot.
 Handles all scan-related HTTP endpoints.
 """
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
 from typing import List
 
+from config import get_settings
 from models import (
     ScanRequest,
     ScanResponse,
@@ -17,8 +18,28 @@ from models import (
     Recommendation
 )
 from services import get_scan_service
+from utils.rate_limiter import get_rate_limiter
 
-router = APIRouter(prefix="/api", tags=["Scans"])
+router = APIRouter(prefix="/api", tags=["Scans"], dependencies=[Depends(check_rate_limit)])
+
+_api_limiter_initialized = False
+
+
+async def check_rate_limit(request: Request):
+    """Dependency that limits API request rate."""
+    global _api_limiter_initialized
+    settings = get_settings()
+    limiter = get_rate_limiter()
+    
+    if not _api_limiter_initialized:
+        limiter.get_limiter(
+            "api",
+            requests_per_second=max(settings.api_rate_limit / 60.0, 0.1),
+            burst_size=settings.api_rate_limit
+        )
+        _api_limiter_initialized = True
+    
+    await limiter.acquire("api", tokens=1)
 
 
 # ============== SCAN ENDPOINTS ==============
