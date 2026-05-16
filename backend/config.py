@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     scan_timeout: float = 1.0  # Timeout per port in seconds
     max_concurrent_scans: int = 50  # Max concurrent port checks
     
+    # CORS configuration
+    cors_origins: str = "http://localhost:8000"  # Comma-separated origins
+    
     # Server configuration
     host: str = "0.0.0.0"
     port: int = 8000

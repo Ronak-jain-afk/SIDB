@@ -98,9 +98,11 @@ app = FastAPI(
 )
 
 # Configure CORS for frontend access
+settings = get_settings()
+allowed_origins = [o.strip() for o in settings.cors_origins.split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for hackathon demo
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
