@@ -4,11 +4,14 @@ Orchestrates the entire scan workflow as a background task.
 """
 
 import asyncio
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional
 
 from models import ScanResult, ScanStatus
+
+logger = logging.getLogger(__name__)
 from storage import get_database
 from discovery import get_discovery
 from analysis import get_risk_engine
@@ -83,9 +86,9 @@ class ScanService:
         """
         try:
             # ======= PHASE 1: SCANNING =======
-            print(f"[{scan_id}] Starting asset discovery for {domain}")
+            logger.info("[%s] Starting asset discovery for %s", scan_id, domain)
             if enable_network_scan:
-                print(f"[{scan_id}] Network scanning enabled")
+                logger.info("[%s] Network scanning enabled", scan_id)
             await self._update_status(scan_id, ScanStatus.SCANNING)
             
             # Add small delay for realistic demo feel
@@ -96,10 +99,10 @@ class ScanService:
                 domain,
                 use_network_scan=enable_network_scan
             )
-            print(f"[{scan_id}] Discovered {len(assets)} assets")
+            logger.info("[%s] Discovered %d assets", scan_id, len(assets))
             
             # ======= PHASE 2: ANALYZING =======
-            print(f"[{scan_id}] Analyzing risks")
+            logger.info("[%s] Analyzing risks", scan_id)
             await self._update_status(scan_id, ScanStatus.ANALYZING)
             
             await asyncio.sleep(0.5)
@@ -111,11 +114,11 @@ class ScanService:
             recommendations = self.recommendation_engine.generate_recommendations(
                 analyzed_assets
             )
-            print(f"[{scan_id}] Generated {len(recommendations)} recommendations")
+            logger.info("[%s] Generated %d recommendations", scan_id, len(recommendations))
             
             # Calculate posture score
             posture_score = calculate_posture_score(analyzed_assets)
-            print(f"[{scan_id}] Security posture: {posture_score.score}/100 ({posture_score.rating.value})")
+            logger.info("[%s] Security posture: %d/100 (%s)", scan_id, posture_score.score, posture_score.rating.value)
             
             # ======= PHASE 3: COMPLETING =======
             scan = await self.db.get_scan(scan_id)
@@ -129,10 +132,10 @@ class ScanService:
             scan.completed_at = datetime.utcnow()
             
             await self.db.save_scan(scan)
-            print(f"[{scan_id}] Scan completed successfully")
+            logger.info("[%s] Scan completed successfully", scan_id)
             
         except Exception as e:
-            print(f"[{scan_id}] Scan failed: {e}")
+            logger.error("[%s] Scan failed: %s", scan_id, e)
             await self._update_status(
                 scan_id, 
                 ScanStatus.FAILED, 

@@ -7,6 +7,7 @@ Unauthorized scanning may be illegal in your jurisdiction.
 """
 
 import asyncio
+import logging
 import socket
 import uuid
 from typing import List, Optional, Dict, Tuple
@@ -14,6 +15,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from models import Asset, ExposureLevel
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -137,7 +140,7 @@ class NetworkScanner:
         try:
             ip = await asyncio.to_thread(socket.gethostbyname, target)
         except socket.gaierror:
-            print(f"Could not resolve hostname: {target}")
+            logger.warning("Could not resolve hostname: %s", target)
             return []
         
         # Create semaphore for concurrency control

@@ -5,9 +5,12 @@ Handles discovery of internet-facing assets using Shodan API, network scanning, 
 
 import asyncio
 import json
+import logging
 import httpx
 from typing import List, Optional
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from config import get_settings, is_shodan_available
 from models import Asset, ExposureLevel
@@ -68,18 +71,18 @@ class AssetDiscovery:
         # ======= SOURCE 1: SHODAN API =======
         if is_shodan_available():
             try:
-                print(f"[Discovery] Querying Shodan API for {domain}...")
+                logger.info("[Discovery] Querying Shodan API for %s...", domain)
                 shodan_assets = await self._discover_via_shodan(domain)
                 if shodan_assets:
                     all_assets.extend(shodan_assets)
-                    print(f"[Discovery] Shodan returned {len(shodan_assets)} assets")
+                    logger.info("[Discovery] Shodan returned %d assets", len(shodan_assets))
             except Exception as e:
-                print(f"[Discovery] Shodan API error: {e}")
+                logger.warning("[Discovery] Shodan API error: %s", e)
         
         # ======= SOURCE 2: NETWORK SCANNER =======
         if use_network_scan:
             try:
-                print(f"[Discovery] Running network scan for {domain}...")
+                logger.info("[Discovery] Running network scan for %s...", domain)
                 scan_assets = await self._discover_via_scan(domain, scan_timeout)
                 if scan_assets:
                     # Deduplicate with Shodan results
@@ -91,13 +94,13 @@ class AssetDiscovery:
                         if (a.ip, a.port) not in existing_ips_ports
                     ]
                     all_assets.extend(new_assets)
-                    print(f"[Discovery] Network scan found {len(new_assets)} new assets")
+                    logger.info("[Discovery] Network scan found %d new assets", len(new_assets))
             except Exception as e:
-                print(f"[Discovery] Network scan error: {e}")
+                logger.warning("[Discovery] Network scan error: %s", e)
         
         # ======= SOURCE 3: MOCK DATA FALLBACK =======
         if not all_assets:
-            print(f"[Discovery] Using mock data for {domain}")
+            logger.info("[Discovery] Using mock data for %s", domain)
             all_assets = await self._load_mock_assets(domain)
         
         return all_assets
@@ -147,7 +150,7 @@ class AssetDiscovery:
             # Step 1: Resolve domain to IP using free DNS endpoint
             wait_time = await self.rate_limiter.acquire("shodan")
             if wait_time > 0:
-                print(f"[Shodan] Rate limited, waited {wait_time:.2f}s")
+                logger.info("[Shodan] Rate limited, waited %.2fs", wait_time)
             
             dns_url = f"{self.SHODAN_BASE_URL}/dns/resolve"
             params = {"hostnames": domain, "key": api_key}
@@ -155,17 +158,17 @@ class AssetDiscovery:
             response = await client.get(dns_url, params=params)
             
             if response.status_code != 200:
-                print(f"Shodan DNS API returned status {response.status_code}")
+                logger.warning("Shodan DNS API returned status %d", response.status_code)
                 return []
             
             dns_data = response.json()
             ip_address = dns_data.get(domain)
             
             if not ip_address:
-                print(f"[Shodan] Could not resolve {domain}")
+                logger.warning("[Shodan] Could not resolve %s", domain)
                 return []
             
-            print(f"[Shodan] Resolved {domain} to {ip_address}")
+            logger.info("[Shodan] Resolved %s to %s", domain, ip_address)
             
             # Step 2: Get host info using free /shodan/host/{ip} endpoint
             wait_time = await self.rate_limiter.acquire("shodan")
@@ -176,11 +179,11 @@ class AssetDiscovery:
             response = await client.get(host_url, params=params)
             
             if response.status_code == 404:
-                print(f"[Shodan] No data found for {ip_address}")
+                logger.info("[Shodan] No data found for %s", ip_address)
                 return []
             
             if response.status_code == 429:
-                print("[Shodan] Rate limit exceeded, backing off...")
+                logger.warning("[Shodan] Rate limit exceeded, backing off...")
                 await asyncio.sleep(2.0)
                 return []
             
@@ -209,7 +212,7 @@ class AssetDiscovery:
                         risk_level="Low"
                     ))
             else:
-                print(f"Shodan Host API returned status {response.status_code}")
+                logger.warning("Shodan Host API returned status %d", response.status_code)
         
         return assets
     
@@ -302,7 +305,7 @@ class AssetDiscovery:
                 
                 return assets
             except Exception as e:
-                print(f"Error loading mock data: {e}")
+                logger.error("Error loading mock data: %s", e)
         
         # Fallback to hardcoded mock data
         return self._generate_default_mock_assets(domain)

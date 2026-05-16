@@ -4,6 +4,7 @@ Handles JSON-based persistence for scan results.
 """
 
 import json
+import logging
 import os
 import time
 import aiofiles
@@ -12,6 +13,8 @@ from typing import Optional, List
 from pathlib import Path
 
 from config import get_settings
+
+logger = logging.getLogger(__name__)
 from models import ScanResult, ScanStatus
 
 
@@ -56,7 +59,7 @@ class ScanDatabase:
             
             return True
         except Exception as e:
-            print(f"Error saving scan {scan_result.scan_id}: {e}")
+            logger.error("Error saving scan %s: %s", scan_result.scan_id, e)
             return False
     
     async def get_scan(self, scan_id: str) -> Optional[ScanResult]:
@@ -80,7 +83,7 @@ class ScanDatabase:
                 data = json.loads(content)
                 return ScanResult(**data)
         except Exception as e:
-            print(f"Error reading scan {scan_id}: {e}")
+            logger.error("Error reading scan %s: %s", scan_id, e)
             return None
     
     async def update_scan_status(
@@ -140,7 +143,7 @@ class ScanDatabase:
                 if scan:
                     scans.append(scan)
         except Exception as e:
-            print(f"Error listing scans: {e}")
+            logger.error("Error listing scans: %s", e)
         
         return scans
     
@@ -161,7 +164,7 @@ class ScanDatabase:
                 scan_path.unlink()
                 return True
             except Exception as e:
-                print(f"Error deleting scan {scan_id}: {e}")
+                logger.error("Error deleting scan %s: %s", scan_id, e)
         
         return False
     
@@ -187,10 +190,10 @@ class ScanDatabase:
                     scan_file.unlink()
                     deleted += 1
                 except Exception as e:
-                    print(f"Error deleting old scan {scan_file.name}: {e}")
+                    logger.error("Error deleting old scan %s: %s", scan_file.name, e)
         
         if deleted:
-            print(f"Cleaned up {deleted} old scan(s)")
+            logger.info("Cleaned up %d old scan(s)", deleted)
         return deleted
 
 

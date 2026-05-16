@@ -8,9 +8,18 @@ Run with: uvicorn main:app --reload
 """
 
 import os
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
+
+# Logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S"
+)
+logger = logging.getLogger("shadow")
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -32,23 +41,23 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     settings = get_settings()
-    print("=" * 60)
-    print("Shadow IT Discovery Bot - Starting")
-    print("=" * 60)
-    print(f"Demo Mode: {settings.demo_mode}")
-    print(f"Shodan API: {'Configured' if settings.shodan_api_key else 'Not configured (using mock data)'}")
-    print(f"Scan Retention: {settings.scan_retention_days} days")
+    logger.info("=" * 60)
+    logger.info("Shadow IT Discovery Bot - Starting")
+    logger.info("=" * 60)
+    logger.info("Demo Mode: %s", settings.demo_mode)
+    logger.info("Shodan API: %s", 'Configured' if settings.shodan_api_key else 'Not configured (using mock data)')
+    logger.info("Scan Retention: %s days", settings.scan_retention_days)
     
     # Clean up old scans on startup
     db = get_database()
     db.cleanup_old_scans()
     
-    print("=" * 60)
+    logger.info("=" * 60)
     
     yield
     
     # Shutdown
-    print("Shadow IT Discovery Bot - Shutting down")
+    logger.info("Shadow IT Discovery Bot - Shutting down")
 
 
 # Initialize FastAPI application
