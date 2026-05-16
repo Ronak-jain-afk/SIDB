@@ -129,6 +129,21 @@ const API = {
     },
 
     /**
+     * Compare two scans
+     * @param {string} scanId1 - First scan ID
+     * @param {string} scanId2 - Second scan ID
+     * @returns {Promise<Object>}
+     */
+    async compareScans(scanId1, scanId2) {
+        const response = await fetch(`${this.BASE_URL}/compare/${scanId1}/${scanId2}`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || `Failed to compare scans: ${response.status}`);
+        }
+        return response.json();
+    },
+
+    /**
      * Run complete scan workflow
      * @param {string} domain - Domain to scan
      * @param {boolean} enableNetworkScan - Whether to enable network scanning

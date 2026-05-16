@@ -193,6 +193,33 @@ class ScanResult(BaseModel):
     error_message: Optional[str] = None
 
 
+class ChangedAsset(BaseModel):
+    """An asset whose risk score changed between two scans."""
+    asset: Asset
+    risk_score_before: int
+    risk_level_before: str
+    risk_score_after: int
+    risk_level_after: str
+
+
+class ScanComparison(BaseModel):
+    """Diff between two scan results."""
+    scan_id_before: str
+    scan_id_after: str
+    domain_before: str
+    domain_after: str
+    new_assets: List[Asset] = Field(default_factory=list)
+    removed_assets: List[Asset] = Field(default_factory=list)
+    changed_assets: List[ChangedAsset] = Field(default_factory=list)
+    score_before: int = 0
+    score_after: int = 0
+    rating_before: str = ""
+    rating_after: str = ""
+    total_new: int = 0
+    total_removed: int = 0
+    total_changed: int = 0
+
+
 class DashboardSummary(BaseModel):
     """Aggregated dashboard data for visualization."""
     scan_id: str

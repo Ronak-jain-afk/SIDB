@@ -13,6 +13,7 @@ from models import (
     ScanStatusResponse,
     ScanResult,
     DashboardSummary,
+    ScanComparison,
     ScanStatus,
     Asset,
     Recommendation
@@ -329,3 +330,35 @@ async def get_recommendations(scan_id: str, category: str = None, skip: int = 0,
         recommendations = [r for r in recommendations if r.category == category]
     
     return recommendations[skip:skip + limit]
+
+
+# ============== COMPARISON ENDPOINT ==============
+
+@router.get(
+    "/compare/{scan_id_1}/{scan_id_2}",
+    response_model=ScanComparison,
+    summary="Compare Two Scans",
+    description="Compare two completed scans to see added, removed, and changed assets."
+)
+async def compare_scans(scan_id_1: str, scan_id_2: str):
+    """
+    Compare two completed scan results.
+    
+    Returns a diff showing:
+    - New assets discovered in the later scan
+    - Assets no longer found in the later scan
+    - Assets whose risk score changed
+    - Posture score change
+    
+    Useful for tracking remediation progress over time.
+    """
+    service = get_scan_service()
+    comparison = await service.compare_scans(scan_id_1, scan_id_2)
+    
+    if not comparison:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="One or both scans not found or not completed"
+        )
+    
+    return comparison

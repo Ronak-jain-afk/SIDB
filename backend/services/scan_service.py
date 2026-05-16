@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from models import ScanResult, ScanStatus, Recommendation, RiskLevel
+from models import Asset, ChangedAsset, ScanComparison, ScanResult, ScanStatus, Recommendation, RiskLevel
 from storage import get_database
 from discovery import get_discovery, get_dns_analyzer
 from analysis import get_risk_engine, get_ssl_analyzer
@@ -242,6 +242,70 @@ class ScanService:
             "started_at": scan.started_at,
             "completed_at": scan.completed_at
         }
+    
+    async def compare_scans(self, scan_id_1: str, scan_id_2: str) -> Optional[ScanComparison]:
+        """
+        Compare two completed scans and return the diff.
+        
+        Args:
+            scan_id_1: Earlier scan ID
+            scan_id_2: Later scan ID
+            
+        Returns:
+            ScanComparison with added/removed/changed assets
+        """
+        scan1 = await self.db.get_scan(scan_id_1)
+        scan2 = await self.db.get_scan(scan_id_2)
+        
+        if not scan1 or not scan2:
+            return None
+        if scan1.status != ScanStatus.COMPLETED or scan2.status != ScanStatus.COMPLETED:
+            return None
+        
+        assets1 = {(a.ip, a.port): a for a in scan1.assets}
+        assets2 = {(a.ip, a.port): a for a in scan2.assets}
+        
+        keys1 = set(assets1.keys())
+        keys2 = set(assets2.keys())
+        
+        new_keys = keys2 - keys1
+        removed_keys = keys1 - keys2
+        common_keys = keys1 & keys2
+        
+        new_assets = [assets2[k] for k in sorted(new_keys)]
+        removed_assets = [assets1[k] for k in sorted(removed_keys)]
+        
+        changed_assets = []
+        for key in common_keys:
+            a1, a2 = assets1[key], assets2[key]
+            if a1.risk_score != a2.risk_score:
+                changed_assets.append(ChangedAsset(
+                    asset=a2,
+                    risk_score_before=a1.risk_score,
+                    risk_level_before=a1.risk_level.value,
+                    risk_score_after=a2.risk_score,
+                    risk_level_after=a2.risk_level.value
+                ))
+        
+        score1 = scan1.posture_score.score if scan1.posture_score else 0
+        score2 = scan2.posture_score.score if scan2.posture_score else 0
+        
+        return ScanComparison(
+            scan_id_before=scan_id_1,
+            scan_id_after=scan_id_2,
+            domain_before=scan1.domain,
+            domain_after=scan2.domain,
+            new_assets=new_assets,
+            removed_assets=removed_assets,
+            changed_assets=changed_assets,
+            score_before=score1,
+            score_after=score2,
+            rating_before=scan1.posture_score.rating.value if scan1.posture_score else "",
+            rating_after=scan2.posture_score.rating.value if scan2.posture_score else "",
+            total_new=len(new_assets),
+            total_removed=len(removed_assets),
+            total_changed=len(changed_assets)
+        )
     
     async def _update_status(
         self, 
