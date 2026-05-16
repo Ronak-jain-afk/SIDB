@@ -196,7 +196,15 @@ class NetworkScanner:
                 # Subdomain doesn't exist
                 continue
         
-        return assets
+        # Deduplicate by (ip, port) since multiple subdomains can resolve to the same host
+        seen = set()
+        unique = []
+        for asset in assets:
+            key = (asset.ip, asset.port)
+            if key not in seen:
+                seen.add(key)
+                unique.append(asset)
+        return unique
     
     async def _scan_port(
         self,
