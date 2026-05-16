@@ -252,7 +252,7 @@ class NetworkScanner:
                 writer.close()
                 try:
                     await writer.wait_closed()
-                except:
+                except Exception:
                     pass
                 
                 # Create asset
@@ -309,8 +309,8 @@ class NetworkScanner:
                     timeout=0.5
                 )
                 return banner
-            except:
-                pass
+            except Exception:
+                logger.debug("HTTP probe failed for port %d", port)
         
         return None
     
@@ -344,8 +344,8 @@ class NetworkScanner:
             elif "vsftpd" in text.lower():
                 return "vsFTPd"
             
-        except:
-            pass
+        except Exception:
+            logger.debug("Failed to extract technology from banner")
         
         return None
     
@@ -368,8 +368,8 @@ class NetworkScanner:
                 match = re.search(pattern, text, re.IGNORECASE)
                 if match:
                     return match.group(1)
-        except:
-            pass
+        except Exception:
+            logger.debug("Failed to extract version from banner")
         
         return None
 
