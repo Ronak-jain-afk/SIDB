@@ -41,6 +41,7 @@ class AssetDiscovery:
         self.mock_data_path = Path(self.settings.mock_dir) / "mock_assets.json"
         self.rate_limiter = get_rate_limiter()
         self.network_scanner = None
+        self._shodan_client = httpx.AsyncClient(timeout=30.0)
         
         # Initialize Shodan rate limiter
         self.rate_limiter.get_limiter(
@@ -146,73 +147,73 @@ class AssetDiscovery:
         assets = []
         api_key = self.settings.shodan_api_key
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Step 1: Resolve domain to IP using free DNS endpoint
-            wait_time = await self.rate_limiter.acquire("shodan")
-            if wait_time > 0:
-                logger.info("[Shodan] Rate limited, waited %.2fs", wait_time)
+        client = self._shodan_client
+        # Step 1: Resolve domain to IP using free DNS endpoint
+        wait_time = await self.rate_limiter.acquire("shodan")
+        if wait_time > 0:
+            logger.info("[Shodan] Rate limited, waited %.2fs", wait_time)
+        
+        dns_url = f"{self.SHODAN_BASE_URL}/dns/resolve"
+        params = {"hostnames": domain, "key": api_key}
+        
+        response = await client.get(dns_url, params=params)
+        
+        if response.status_code != 200:
+            logger.warning("Shodan DNS API returned status %d", response.status_code)
+            return []
+        
+        dns_data = response.json()
+        ip_address = dns_data.get(domain)
+        
+        if not ip_address:
+            logger.warning("[Shodan] Could not resolve %s", domain)
+            return []
+        
+        logger.info("[Shodan] Resolved %s to %s", domain, ip_address)
+        
+        # Step 2: Get host info using free /shodan/host/{ip} endpoint
+        wait_time = await self.rate_limiter.acquire("shodan")
+        
+        host_url = f"{self.SHODAN_BASE_URL}/shodan/host/{ip_address}"
+        params = {"key": api_key}
+        
+        response = await client.get(host_url, params=params)
+        
+        if response.status_code == 404:
+            logger.info("[Shodan] No data found for %s", ip_address)
+            return []
+        
+        if response.status_code == 429:
+            logger.warning("[Shodan] Rate limit exceeded, backing off...")
+            await asyncio.sleep(2.0)
+            return []
+        
+        if response.status_code == 200:
+            host_data = response.json()
+            # Host data contains ports array with service info
+            ports_data = host_data.get("data", [])
             
-            dns_url = f"{self.SHODAN_BASE_URL}/dns/resolve"
-            params = {"hostnames": domain, "key": api_key}
-            
-            response = await client.get(dns_url, params=params)
-            
-            if response.status_code != 200:
-                logger.warning("Shodan DNS API returned status %d", response.status_code)
-                return []
-            
-            dns_data = response.json()
-            ip_address = dns_data.get(domain)
-            
-            if not ip_address:
-                logger.warning("[Shodan] Could not resolve %s", domain)
-                return []
-            
-            logger.info("[Shodan] Resolved %s to %s", domain, ip_address)
-            
-            # Step 2: Get host info using free /shodan/host/{ip} endpoint
-            wait_time = await self.rate_limiter.acquire("shodan")
-            
-            host_url = f"{self.SHODAN_BASE_URL}/shodan/host/{ip_address}"
-            params = {"key": api_key}
-            
-            response = await client.get(host_url, params=params)
-            
-            if response.status_code == 404:
-                logger.info("[Shodan] No data found for %s", ip_address)
-                return []
-            
-            if response.status_code == 429:
-                logger.warning("[Shodan] Rate limit exceeded, backing off...")
-                await asyncio.sleep(2.0)
-                return []
-            
-            if response.status_code == 200:
-                host_data = response.json()
-                # Host data contains ports array with service info
-                ports_data = host_data.get("data", [])
+            for idx, port_info in enumerate(ports_data[:20]):
+                asset = self._normalize_shodan_host_result(
+                    host_data, port_info, domain, idx
+                )
+                assets.append(asset)
                 
-                for idx, port_info in enumerate(ports_data[:20]):
-                    asset = self._normalize_shodan_host_result(
-                        host_data, port_info, domain, idx
-                    )
-                    assets.append(asset)
-                    
-                if not ports_data:
-                    # Create a basic asset for the IP even without port data
-                    assets.append(Asset(
-                        asset_id=f"SHODAN-{domain.upper().replace('.', '-')}-{ip_address.replace('.', '-')}",
-                        domain=domain,
-                        ip=ip_address,
-                        port=0,
-                        service="Unknown",
-                        technology=host_data.get("os", "Unknown"),
-                        hostnames=host_data.get("hostnames", []),
-                        risk_score=0,
-                        risk_level="Low"
-                    ))
-            else:
-                logger.warning("Shodan Host API returned status %d", response.status_code)
+            if not ports_data:
+                # Create a basic asset for the IP even without port data
+                assets.append(Asset(
+                    asset_id=f"SHODAN-{domain.upper().replace('.', '-')}-{ip_address.replace('.', '-')}",
+                    ip=ip_address,
+                    port=0,
+                    service="Unknown",
+                    technology=host_data.get("os", "Unknown"),
+                    hostname=(host_data.get("hostnames") or [None])[0],
+                    exposure=ExposureLevel.PUBLIC,
+                    risk_score=0,
+                    risk_level="Low"
+                ))
+        else:
+            logger.warning("Shodan Host API returned status %d", response.status_code)
         
         return assets
     
