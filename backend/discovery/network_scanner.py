@@ -371,13 +371,12 @@ class NetworkScanner:
         return None
 
 
-# Singleton instance
-_scanner_instance: Optional[NetworkScanner] = None
+# Singleton instance (eager initialization)
+_scanner_instance: NetworkScanner = NetworkScanner()
 
 
 def get_network_scanner(config: ScanConfig = None) -> NetworkScanner:
-    """Get or create the network scanner singleton."""
-    global _scanner_instance
-    if _scanner_instance is None or config is not None:
-        _scanner_instance = NetworkScanner(config)
+    """Get the network scanner singleton. If config provided, return a new instance."""
+    if config is not None:
+        return NetworkScanner(config)
     return _scanner_instance

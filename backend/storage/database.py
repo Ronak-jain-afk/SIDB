@@ -194,13 +194,10 @@ class ScanDatabase:
         return deleted
 
 
-# Global database instance
-_db_instance: Optional[ScanDatabase] = None
+# Global database instance (eager initialization)
+_db_instance: ScanDatabase = ScanDatabase()
 
 
 def get_database() -> ScanDatabase:
-    """Get or create the database singleton instance."""
-    global _db_instance
-    if _db_instance is None:
-        _db_instance = ScanDatabase()
+    """Get the database singleton instance."""
     return _db_instance

@@ -496,13 +496,10 @@ class AssetDiscovery:
         ]
 
 
-# Singleton instance
-_discovery_instance: Optional[AssetDiscovery] = None
+# Singleton instance (eager initialization)
+_discovery_instance: AssetDiscovery = AssetDiscovery()
 
 
 def get_discovery() -> AssetDiscovery:
-    """Get or create the discovery singleton instance."""
-    global _discovery_instance
-    if _discovery_instance is None:
-        _discovery_instance = AssetDiscovery()
+    """Get the discovery singleton instance."""
     return _discovery_instance

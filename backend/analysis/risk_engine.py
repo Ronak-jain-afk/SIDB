@@ -313,13 +313,10 @@ class RiskEngine:
             return RiskLevel.CRITICAL
 
 
-# Singleton instance
-_engine_instance = None
+# Singleton instance (eager initialization)
+_engine_instance: RiskEngine = RiskEngine()
 
 
 def get_risk_engine() -> RiskEngine:
-    """Get or create the risk engine singleton instance."""
-    global _engine_instance
-    if _engine_instance is None:
-        _engine_instance = RiskEngine()
+    """Get the risk engine singleton instance."""
     return _engine_instance

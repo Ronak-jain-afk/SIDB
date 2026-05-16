@@ -144,13 +144,10 @@ class MultiRateLimiter:
         return 0.0
 
 
-# Global rate limiter instance
-_rate_limiter: Optional[MultiRateLimiter] = None
+# Global rate limiter instance (eager initialization)
+_rate_limiter: MultiRateLimiter = MultiRateLimiter()
 
 
 def get_rate_limiter() -> MultiRateLimiter:
     """Get the global rate limiter instance."""
-    global _rate_limiter
-    if _rate_limiter is None:
-        _rate_limiter = MultiRateLimiter()
     return _rate_limiter

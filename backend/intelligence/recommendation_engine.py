@@ -384,13 +384,10 @@ class RecommendationEngine:
         return recommendations
 
 
-# Singleton instance
-_engine_instance = None
+# Singleton instance (eager initialization)
+_engine_instance: RecommendationEngine = RecommendationEngine()
 
 
 def get_recommendation_engine() -> RecommendationEngine:
-    """Get or create the recommendation engine singleton instance."""
-    global _engine_instance
-    if _engine_instance is None:
-        _engine_instance = RecommendationEngine()
+    """Get the recommendation engine singleton instance."""
     return _engine_instance

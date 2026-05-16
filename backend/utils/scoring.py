@@ -203,15 +203,12 @@ class ScoringCalculator:
             )
 
 
-# Singleton instance
-_calculator_instance = None
+# Singleton instance (eager initialization)
+_calculator_instance: ScoringCalculator = ScoringCalculator()
 
 
 def get_scoring_calculator() -> ScoringCalculator:
-    """Get or create the scoring calculator singleton."""
-    global _calculator_instance
-    if _calculator_instance is None:
-        _calculator_instance = ScoringCalculator()
+    """Get the scoring calculator singleton."""
     return _calculator_instance
 
 

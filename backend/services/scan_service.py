@@ -190,13 +190,10 @@ class ScanService:
         await self.db.update_scan_status(scan_id, status, error_message)
 
 
-# Singleton instance
-_service_instance: Optional[ScanService] = None
+# Singleton instance (eager initialization)
+_service_instance: ScanService = ScanService()
 
 
 def get_scan_service() -> ScanService:
-    """Get or create the scan service singleton."""
-    global _service_instance
-    if _service_instance is None:
-        _service_instance = ScanService()
+    """Get the scan service singleton."""
     return _service_instance
