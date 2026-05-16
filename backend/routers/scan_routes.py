@@ -225,12 +225,14 @@ async def get_dashboard_summary(scan_id: str):
     summary="Get All Assets",
     description="Get all discovered assets for a scan."
 )
-async def get_assets(scan_id: str, risk_level: str = None):
+async def get_assets(scan_id: str, risk_level: str = None, skip: int = 0, limit: int = 100):
     """
     Get all assets from a completed scan.
     
     **Query params:**
     - risk_level: Filter by risk level (Critical, High, Medium, Low)
+    - skip: Number of assets to skip (for pagination)
+    - limit: Maximum number of assets to return (default 100)
     """
     service = get_scan_service()
     scan = await service.get_scan(scan_id)
@@ -247,7 +249,7 @@ async def get_assets(scan_id: str, risk_level: str = None):
     if risk_level:
         assets = [a for a in assets if a.risk_level.value == risk_level]
     
-    return assets
+    return assets[skip:skip + limit]
 
 
 @router.get(
@@ -285,12 +287,14 @@ async def get_asset(scan_id: str, asset_id: str):
     summary="Get All Recommendations",
     description="Get all remediation recommendations for a scan."
 )
-async def get_recommendations(scan_id: str, category: str = None):
+async def get_recommendations(scan_id: str, category: str = None, skip: int = 0, limit: int = 100):
     """
     Get all recommendations from a completed scan.
     
     **Query params:**
     - category: Filter by category (Network Security, Access Control, etc.)
+    - skip: Number of recommendations to skip (for pagination)
+    - limit: Maximum number of recommendations to return (default 100)
     """
     service = get_scan_service()
     scan = await service.get_scan(scan_id)
@@ -307,4 +311,4 @@ async def get_recommendations(scan_id: str, category: str = None):
     if category:
         recommendations = [r for r in recommendations if r.category == category]
     
-    return recommendations
+    return recommendations[skip:skip + limit]
