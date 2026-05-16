@@ -12,7 +12,7 @@ from typing import Optional
 from models import ScanResult, ScanStatus, Recommendation, RiskLevel
 from storage import get_database
 from discovery import get_discovery, get_dns_analyzer
-from analysis import get_risk_engine
+from analysis import get_risk_engine, get_ssl_analyzer
 from intelligence import get_recommendation_engine
 from utils import calculate_posture_score
 
@@ -117,6 +117,25 @@ class ScanService:
                 analyzed_assets
             )
             logger.info("[%s] Generated %d recommendations", scan_id, len(recommendations))
+            
+            # ======= SSL/TLS ANALYSIS =======
+            ssl_analyzer = get_ssl_analyzer()
+            ssl_ports = {443, 8443, 993, 995}
+            for asset in analyzed_assets:
+                if asset.port in ssl_ports and asset.ip:
+                    try:
+                        factors = await ssl_analyzer.analyze_asset(
+                            asset.ip, asset.port, asset.hostname
+                        )
+                        for factor in factors:
+                            if factor not in asset.risk_factors:
+                                asset.risk_factors.append(factor)
+                                asset.risk_score = min(asset.risk_score + 15, 100)
+                        if factors:
+                            asset.risk_level = self.risk_engine._classify_risk(asset.risk_score)
+                    except Exception as e:
+                        logger.debug("[%s] SSL analysis failed for %s:%d - %s",
+                                     scan_id, asset.ip, asset.port, e)
             
             # ======= DNS ANALYSIS =======
             dns_recs = []
