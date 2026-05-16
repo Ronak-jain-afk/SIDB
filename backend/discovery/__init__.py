@@ -1,5 +1,6 @@
 # Discovery package
 from .asset_discovery import AssetDiscovery, get_discovery
+from .dns_analyzer import DNSAnalyzer, DNSAnalysis, get_dns_analyzer
 from .network_scanner import NetworkScanner, ScanConfig, get_network_scanner
 from .subdomain_enum import SubdomainEnumerator, get_subdomain_enumerator
 

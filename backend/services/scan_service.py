@@ -9,11 +9,9 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from models import ScanResult, ScanStatus
-
-logger = logging.getLogger(__name__)
+from models import ScanResult, ScanStatus, Recommendation, RiskLevel
 from storage import get_database
-from discovery import get_discovery
+from discovery import get_discovery, get_dns_analyzer
 from analysis import get_risk_engine
 from intelligence import get_recommendation_engine
 from utils import calculate_posture_score
@@ -120,7 +118,28 @@ class ScanService:
             )
             logger.info("[%s] Generated %d recommendations", scan_id, len(recommendations))
             
-            # Calculate posture score
+            # ======= DNS ANALYSIS =======
+            dns_recs = []
+            if not cidr:
+                logger.info("[%s] Analyzing DNS security records for %s", scan_id, target)
+                try:
+                    dns = get_dns_analyzer()
+                    dns_result = await dns.analyze(target)
+                    for idx, factor in enumerate(dns_result.risk_factors):
+                        dns_recs.append(Recommendation(
+                            recommendation_id=f"DNS-{scan_id[:8]}-{idx:03d}",
+                            asset_id="DOMAIN",
+                            title=f"DNS Security: {factor.split(' - ')[0]}",
+                            description=factor,
+                            priority=RiskLevel.MEDIUM,
+                            category="Email Security"
+                        ))
+                    if dns_recs:
+                        logger.info("[%s] DNS analysis found %d issues", scan_id, len(dns_recs))
+                except Exception as e:
+                    logger.warning("[%s] DNS analysis error: %s", scan_id, e)
+            
+            # Calculate posture score (include DNS findings)
             posture_score = calculate_posture_score(analyzed_assets)
             logger.info("[%s] Security posture: %d/100 (%s)", scan_id, posture_score.score, posture_score.rating.value)
             
@@ -130,7 +149,7 @@ class ScanService:
                 raise RuntimeError(f"Scan record {scan_id} not found in database")
             
             scan.assets = analyzed_assets
-            scan.recommendations = recommendations
+            scan.recommendations = recommendations + dns_recs
             scan.posture_score = posture_score
             scan.status = ScanStatus.COMPLETED
             scan.completed_at = datetime.utcnow()
