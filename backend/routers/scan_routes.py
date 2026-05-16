@@ -56,32 +56,49 @@ async def start_scan(
     background_tasks: BackgroundTasks
 ):
     """
-    Start a new scan for the specified domain.
+    Start a new scan for the specified domain or CIDR range.
     
     The scan runs asynchronously in the background.
     Use the returned scan_id to poll for status and results.
     
-    **Example request:**
+    **Example requests:**
     ```json
     {"domain": "example.com", "enable_network_scan": false}
+    {"cidr": "192.168.1.0/24", "enable_network_scan": true}
     ```
     
     **Returns:** scan_id and initial status
     
     **Note:** Set `enable_network_scan: true` to perform active port scanning.
-    Only enable this for domains you own or have permission to scan.
+    Only enable this for networks you own or have permission to scan.
     """
     service = get_scan_service()
     
+    target = request.domain or request.cidr
+    
     # Create initial scan record
-    scan = await service.create_scan(request.domain)
+    scan = await service.create_scan(target)
     
     # Queue background scan with network scan option
     background_tasks.add_task(
         service.run_scan,
         scan.scan_id,
-        request.domain,
-        request.enable_network_scan
+        request.domain or "",
+        request.enable_network_scan,
+        request.cidr
+    )
+    
+    if request.cidr:
+        scan_type = "CIDR scan"
+    elif request.enable_network_scan:
+        scan_type = "Network scan"
+    else:
+        scan_type = "OSINT scan"
+    
+    return ScanResponse(
+        scan_id=scan.scan_id,
+        status=ScanStatus.PENDING,
+        message=f"{scan_type} initiated for {target}. Poll /api/scan/{scan.scan_id}/status for progress."
     )
     
     scan_type = "network scan" if request.enable_network_scan else "OSINT scan"

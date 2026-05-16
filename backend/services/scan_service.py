@@ -40,14 +40,14 @@ class ScanService:
         self.risk_engine = get_risk_engine()
         self.recommendation_engine = get_recommendation_engine()
     
-    async def create_scan(self, domain: str) -> ScanResult:
+    async def create_scan(self, target: str) -> ScanResult:
         """
         Initialize a new scan record.
         
         Creates a pending scan with unique ID for tracking.
         
         Args:
-            domain: Target domain to scan
+            target: Target domain or CIDR to scan
             
         Returns:
             Initial ScanResult with pending status
@@ -56,7 +56,7 @@ class ScanService:
         
         scan = ScanResult(
             scan_id=scan_id,
-            domain=domain,
+            domain=target,
             status=ScanStatus.PENDING,
             started_at=datetime.utcnow(),
             assets=[],
@@ -71,7 +71,8 @@ class ScanService:
         self, 
         scan_id: str, 
         domain: str,
-        enable_network_scan: bool = False
+        enable_network_scan: bool = False,
+        cidr: str = None
     ) -> None:
         """
         Execute the full scan workflow as background task.
@@ -83,10 +84,12 @@ class ScanService:
             scan_id: Scan identifier for tracking
             domain: Target domain to scan
             enable_network_scan: Enable active network scanning
+            cidr: Optional CIDR range to scan instead of domain
         """
         try:
+            target = cidr or domain
             # ======= PHASE 1: SCANNING =======
-            logger.info("[%s] Starting asset discovery for %s", scan_id, domain)
+            logger.info("[%s] Starting asset discovery for %s", scan_id, target)
             if enable_network_scan:
                 logger.info("[%s] Network scanning enabled", scan_id)
             await self._update_status(scan_id, ScanStatus.SCANNING)
@@ -94,10 +97,11 @@ class ScanService:
             # Add small delay for realistic demo feel
             await asyncio.sleep(1)
             
-            # Discover assets (with optional network scan)
+            # Discover assets (with optional network scan / CIDR)
             assets = await self.discovery.discover_assets(
                 domain,
-                use_network_scan=enable_network_scan
+                use_network_scan=enable_network_scan,
+                cidr=cidr
             )
             logger.info("[%s] Discovered %d assets", scan_id, len(assets))
             

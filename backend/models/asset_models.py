@@ -6,7 +6,7 @@ Defines Pydantic schemas for assets, scans, and API responses.
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class RiskLevel(str, Enum):
@@ -131,23 +131,36 @@ class PostureScore(BaseModel):
 
 class ScanRequest(BaseModel):
     """Request body for starting a new scan."""
-    domain: str = Field(
-        ...,
+    domain: Optional[str] = Field(
+        None,
         min_length=3,
         pattern=r"^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$",
         description="Target domain to scan (e.g., example.com)"
+    )
+    cidr: Optional[str] = Field(
+        None,
+        pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$",
+        description="CIDR range to scan (e.g., 192.168.1.0/24)"
     )
     enable_network_scan: bool = Field(
         False, 
         description="Enable active network scanning (requires permission)"
     )
     
+    @model_validator(mode='after')
+    def check_target(self):
+        if not self.domain and not self.cidr:
+            raise ValueError("Either 'domain' or 'cidr' must be provided")
+        if self.domain and self.cidr:
+            raise ValueError("Provide either 'domain' or 'cidr', not both")
+        return self
+    
     class Config:
         json_schema_extra = {
-            "example": {
-                "domain": "example.com",
-                "enable_network_scan": False
-            }
+            "examples": [
+                {"domain": "example.com", "enable_network_scan": False},
+                {"cidr": "192.168.1.0/24", "enable_network_scan": True}
+            ]
         }
 
 

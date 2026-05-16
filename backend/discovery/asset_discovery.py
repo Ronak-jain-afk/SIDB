@@ -55,7 +55,8 @@ class AssetDiscovery:
         self, 
         domain: str,
         use_network_scan: bool = False,
-        scan_timeout: float = 1.0
+        scan_timeout: float = 1.0,
+        cidr: str = None
     ) -> List[Asset]:
         """
         Main discovery entry point.
@@ -64,14 +65,19 @@ class AssetDiscovery:
             domain: Target domain to discover assets for
             use_network_scan: Enable network scanning (requires permission)
             scan_timeout: Timeout per port when scanning
+            cidr: CIDR range to scan (overrides domain-based discovery)
             
         Returns:
             List of discovered assets
         """
         all_assets = []
         
+        # CIDR scan takes priority over domain-based discovery
+        if cidr:
+            logger.info("[Discovery] Scanning CIDR range %s...", cidr)
+            return await self._discover_via_cidr(cidr, use_network_scan, scan_timeout)
+        
         # ======= SOURCE 1: SHODAN API =======
-        if is_shodan_available():
             try:
                 logger.info("[Discovery] Querying Shodan API for %s...", domain)
                 shodan_assets = await self._discover_via_shodan(domain)
@@ -144,6 +150,20 @@ class AssetDiscovery:
             self.network_scanner = NetworkScanner(config)
         
         return await self.network_scanner.scan_domain(domain)
+    
+    async def _discover_via_cidr(
+        self, 
+        cidr: str,
+        use_network_scan: bool,
+        scan_timeout: float
+    ) -> List[Asset]:
+        """Discover assets by scanning a CIDR range."""
+        if not use_network_scan:
+            logger.warning("[Discovery] CIDR scan requires network scanning to be enabled")
+            return []
+        config = ScanConfig(timeout=scan_timeout)
+        scanner = NetworkScanner(config)
+        return await scanner.scan_cidr(cidr)
     
     async def _discover_via_shodan(self, domain: str) -> List[Asset]:
         """

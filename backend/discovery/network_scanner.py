@@ -7,6 +7,7 @@ Unauthorized scanning may be illegal in your jurisdiction.
 """
 
 import asyncio
+import ipaddress
 import logging
 import socket
 import uuid
@@ -208,6 +209,44 @@ class NetworkScanner:
                 seen.add(key)
                 unique.append(asset)
         return unique
+    
+    async def scan_cidr(
+        self,
+        cidr: str,
+        ports: List[int] = None
+    ) -> List[Asset]:
+        """
+        Scan an entire CIDR range for open ports.
+        
+        Args:
+            cidr: CIDR notation (e.g., '192.168.1.0/24')
+            ports: List of ports to scan (uses default if None)
+            
+        Returns:
+            List of discovered assets across all IPs in range
+        """
+        ports = ports or self.config.ports
+        all_assets = []
+        
+        try:
+            network = ipaddress.IPv4Network(cidr, strict=False)
+        except ValueError as e:
+            logger.error("Invalid CIDR: %s - %s", cidr, e)
+            return []
+        
+        # Limit to /16 or smaller to prevent accidental mass scans
+        if network.prefixlen < 16:
+            logger.warning("CIDR %s is too large (prefix < 16). Use a /16 or smaller range.", cidr)
+            return []
+        
+        logger.info("[CIDR] Scanning range %s (%d hosts)...", cidr, network.num_addresses)
+        
+        for ip_addr in network.hosts():
+            host_assets = await self.scan_target(str(ip_addr), ports)
+            all_assets.extend(host_assets)
+        
+        logger.info("[CIDR] Found %d assets in range %s", len(all_assets), cidr)
+        return all_assets
     
     async def _scan_port(
         self,
