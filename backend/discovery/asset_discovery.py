@@ -16,6 +16,7 @@ from config import get_settings, is_shodan_available
 from models import Asset, ExposureLevel
 from utils.rate_limiter import get_rate_limiter
 from discovery.network_scanner import NetworkScanner, ScanConfig
+from discovery.subdomain_enum import get_subdomain_enumerator
 
 
 class AssetDiscovery:
@@ -99,7 +100,21 @@ class AssetDiscovery:
             except Exception as e:
                 logger.warning("[Discovery] Network scan error: %s", e)
         
-        # ======= SOURCE 3: MOCK DATA FALLBACK =======
+        # ======= SOURCE 3: CRT.SH SUBDOMAIN ENUMERATION =======
+        try:
+            logger.info("[Discovery] Enumerating subdomains via crt.sh for %s...", domain)
+            enumerator = get_subdomain_enumerator()
+            subdomain_assets = await enumerator.enumerate_as_assets(domain)
+            if subdomain_assets:
+                existing_ips = {a.ip for a in all_assets}
+                new_assets = [a for a in subdomain_assets if a.ip not in existing_ips]
+                if new_assets:
+                    all_assets.extend(new_assets)
+                    logger.info("[Discovery] crt.sh found %d new subdomain assets", len(new_assets))
+        except Exception as e:
+            logger.warning("[Discovery] crt.sh enumeration error: %s", e)
+        
+        # ======= SOURCE 4: MOCK DATA FALLBACK =======
         if not all_assets:
             logger.info("[Discovery] Using mock data for %s", domain)
             all_assets = await self._load_mock_assets(domain)
