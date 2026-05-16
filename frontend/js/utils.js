@@ -65,11 +65,10 @@ const Utils = {
      * Get posture rating text
      */
     getPostureRating(score) {
-        if (score >= 80) return 'Excellent';
-        if (score >= 60) return 'Good';
-        if (score >= 40) return 'Fair';
-        if (score >= 20) return 'Poor';
-        return 'Critical';
+        if (score >= 80) return 'Secure';
+        if (score >= 60) return 'Moderate Risk';
+        if (score >= 40) return 'High Risk';
+        return 'Critical Exposure';
     },
 
     /**
@@ -77,9 +76,8 @@ const Utils = {
      */
     getPostureColor(score) {
         if (score >= 80) return '#22c55e';
-        if (score >= 60) return '#84cc16';
-        if (score >= 40) return '#eab308';
-        if (score >= 20) return '#f97316';
+        if (score >= 60) return '#eab308';
+        if (score >= 40) return '#f97316';
         return '#ef4444';
     },
 
