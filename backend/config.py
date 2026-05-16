@@ -3,17 +3,17 @@ Configuration module for Shadow IT Discovery Bot.
 Loads environment variables and provides app-wide settings.
 """
 
-import os
 from functools import lru_cache
-from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False
+    )
     
     # Shodan API configuration
     shodan_api_key: str = ""
@@ -44,10 +44,6 @@ class Settings(BaseSettings):
     data_dir: str = "data"
     scans_dir: str = "data/scans"
     mock_dir: str = "data/mock"
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
 
 
 @lru_cache()
