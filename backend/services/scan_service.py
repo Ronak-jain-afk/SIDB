@@ -13,7 +13,7 @@ from models import ScanResult, ScanStatus, Recommendation, RiskLevel
 from storage import get_database
 from discovery import get_discovery, get_dns_analyzer
 from analysis import get_risk_engine, get_ssl_analyzer
-from intelligence import get_recommendation_engine
+from intelligence import get_cve_lookup, get_recommendation_engine
 from utils import calculate_posture_score
 
 
@@ -136,6 +136,22 @@ class ScanService:
                     except Exception as e:
                         logger.debug("[%s] SSL analysis failed for %s:%d - %s",
                                      scan_id, asset.ip, asset.port, e)
+            
+            # ======= CVE LOOKUP =======
+            cve_lookup = get_cve_lookup()
+            for asset in analyzed_assets:
+                if asset.technology and asset.technology != "Unknown":
+                    try:
+                        cve_result = await cve_lookup.lookup(asset.technology, asset.version)
+                        if cve_result.risk_factors:
+                            for factor in cve_result.risk_factors:
+                                if factor not in asset.risk_factors:
+                                    asset.risk_factors.append(factor)
+                                    asset.risk_score = min(asset.risk_score + 10, 100)
+                            asset.risk_level = self.risk_engine._classify_risk(asset.risk_score)
+                    except Exception as e:
+                        logger.debug("[%s] CVE lookup failed for %s - %s",
+                                     scan_id, asset.technology, e)
             
             # ======= DNS ANALYSIS =======
             dns_recs = []
