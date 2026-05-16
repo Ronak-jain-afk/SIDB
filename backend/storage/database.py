@@ -3,19 +3,20 @@ Storage layer for Shadow IT Discovery Bot.
 Handles JSON-based persistence for scan results.
 """
 
+import asyncio
 import json
 import logging
 import os
 import time
 import aiofiles
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 from pathlib import Path
 
 from config import get_settings
+from models import ScanResult, ScanStatus
 
 logger = logging.getLogger(__name__)
-from models import ScanResult, ScanStatus
 
 
 class ScanDatabase:
@@ -27,6 +28,7 @@ class ScanDatabase:
     def __init__(self):
         self.settings = get_settings()
         self.scans_dir = Path(self.settings.scans_dir)
+        self._locks: Dict[str, asyncio.Lock] = {}
         self._ensure_directories()
     
     def _ensure_directories(self):
@@ -38,6 +40,12 @@ class ScanDatabase:
         """Get the file path for a scan by ID."""
         return self.scans_dir / f"{scan_id}.json"
     
+    def _get_lock(self, scan_id: str) -> asyncio.Lock:
+        """Get or create a per-scan async lock for concurrency safety."""
+        if scan_id not in self._locks:
+            self._locks[scan_id] = asyncio.Lock()
+        return self._locks[scan_id]
+    
     async def save_scan(self, scan_result: ScanResult) -> bool:
         """
         Save scan result to JSON file.
@@ -48,19 +56,20 @@ class ScanDatabase:
         Returns:
             True if saved successfully
         """
-        try:
-            scan_path = self._get_scan_path(scan_result.scan_id)
-            
-            # Convert to JSON-serializable dict with datetime handling
-            data = scan_result.model_dump(mode='json')
-            
-            async with aiofiles.open(scan_path, 'w') as f:
-                await f.write(json.dumps(data, indent=2, default=str))
-            
-            return True
-        except Exception as e:
-            logger.error("Error saving scan %s: %s", scan_result.scan_id, e)
-            return False
+        async with self._get_lock(scan_result.scan_id):
+            try:
+                scan_path = self._get_scan_path(scan_result.scan_id)
+                
+                # Convert to JSON-serializable dict with datetime handling
+                data = scan_result.model_dump(mode='json')
+                
+                async with aiofiles.open(scan_path, 'w') as f:
+                    await f.write(json.dumps(data, indent=2, default=str))
+                
+                return True
+            except Exception as e:
+                logger.error("Error saving scan %s: %s", scan_result.scan_id, e)
+                return False
     
     async def get_scan(self, scan_id: str) -> Optional[ScanResult]:
         """
@@ -72,19 +81,20 @@ class ScanDatabase:
         Returns:
             ScanResult if found, None otherwise
         """
-        scan_path = self._get_scan_path(scan_id)
-        
-        if not scan_path.exists():
-            return None
-        
-        try:
-            async with aiofiles.open(scan_path, 'r') as f:
-                content = await f.read()
-                data = json.loads(content)
-                return ScanResult(**data)
-        except Exception as e:
-            logger.error("Error reading scan %s: %s", scan_id, e)
-            return None
+        async with self._get_lock(scan_id):
+            scan_path = self._get_scan_path(scan_id)
+            
+            if not scan_path.exists():
+                return None
+            
+            try:
+                async with aiofiles.open(scan_path, 'r') as f:
+                    content = await f.read()
+                    data = json.loads(content)
+                    return ScanResult(**data)
+            except Exception as e:
+                logger.error("Error reading scan %s: %s", scan_id, e)
+                return None
     
     async def update_scan_status(
         self, 
