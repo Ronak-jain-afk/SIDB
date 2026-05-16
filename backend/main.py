@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 
 from config import get_settings
 from routers import scan_router
+from storage import get_database
 
 # Frontend directory path
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
@@ -36,6 +37,12 @@ async def lifespan(app: FastAPI):
     print("=" * 60)
     print(f"Demo Mode: {settings.demo_mode}")
     print(f"Shodan API: {'Configured' if settings.shodan_api_key else 'Not configured (using mock data)'}")
+    print(f"Scan Retention: {settings.scan_retention_days} days")
+    
+    # Clean up old scans on startup
+    db = get_database()
+    db.cleanup_old_scans()
+    
     print("=" * 60)
     
     yield

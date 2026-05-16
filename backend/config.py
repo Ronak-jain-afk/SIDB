@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     
+    # Scan retention
+    scan_retention_days: int = 30  # Auto-delete scans older than this
+    
     # Storage paths
     data_dir: str = "data"
     scans_dir: str = "data/scans"

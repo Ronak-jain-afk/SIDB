@@ -5,6 +5,7 @@ Handles JSON-based persistence for scan results.
 
 import json
 import os
+import time
 import aiofiles
 from datetime import datetime
 from typing import Optional, List
@@ -167,6 +168,30 @@ class ScanDatabase:
     def scan_exists(self, scan_id: str) -> bool:
         """Check if a scan exists."""
         return self._get_scan_path(scan_id).exists()
+    
+    def cleanup_old_scans(self) -> int:
+        """
+        Delete scan files older than retention period.
+        
+        Returns:
+            Number of deleted scan files
+        """
+        retention_seconds = self.settings.scan_retention_days * 86400
+        now = time.time()
+        deleted = 0
+        
+        for scan_file in self.scans_dir.glob("*.json"):
+            file_age = now - scan_file.stat().st_mtime
+            if file_age > retention_seconds:
+                try:
+                    scan_file.unlink()
+                    deleted += 1
+                except Exception as e:
+                    print(f"Error deleting old scan {scan_file.name}: {e}")
+        
+        if deleted:
+            print(f"Cleaned up {deleted} old scan(s)")
+        return deleted
 
 
 # Global database instance
