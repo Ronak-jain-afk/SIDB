@@ -6,3 +6,4 @@ pydantic-settings==2.1.0
 python-dotenv==1.0.0
 aiofiles==23.2.1
 dnspython==2.6.1
+reportlab==4.2.0

@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 
 from config import get_settings
-from routers import scan_router
+from routers import report_router, scan_router
 from storage import get_database
 
 # Frontend directory path
@@ -110,6 +110,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(scan_router)
+app.include_router(report_router)
 
 # Serve frontend static files
 if FRONTEND_DIR.exists():
