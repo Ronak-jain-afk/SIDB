@@ -119,15 +119,17 @@ class ScanService:
             
             # ======= PHASE 3: COMPLETING =======
             scan = await self.db.get_scan(scan_id)
-            if scan:
-                scan.assets = analyzed_assets
-                scan.recommendations = recommendations
-                scan.posture_score = posture_score
-                scan.status = ScanStatus.COMPLETED
-                scan.completed_at = datetime.utcnow()
-                
-                await self.db.save_scan(scan)
-                print(f"[{scan_id}] Scan completed successfully")
+            if not scan:
+                raise RuntimeError(f"Scan record {scan_id} not found in database")
+            
+            scan.assets = analyzed_assets
+            scan.recommendations = recommendations
+            scan.posture_score = posture_score
+            scan.status = ScanStatus.COMPLETED
+            scan.completed_at = datetime.utcnow()
+            
+            await self.db.save_scan(scan)
+            print(f"[{scan_id}] Scan completed successfully")
             
         except Exception as e:
             print(f"[{scan_id}] Scan failed: {e}")
