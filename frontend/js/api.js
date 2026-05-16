@@ -5,6 +5,7 @@
 const API = {
     // Backend URL - adjust port if needed
     BASE_URL: 'http://localhost:8000/api',
+    WS_BASE: 'ws://localhost:8000',
     
     // Poll interval for scan status (ms)
     POLL_INTERVAL: 2000,
@@ -129,6 +130,85 @@ const API = {
     },
 
     /**
+     * Watch scan progress via WebSocket (fallback to polling)
+     * @param {string} scanId - Scan ID to watch
+     * @param {function} onProgress - Progress callback
+     * @returns {Promise<void>}
+     */
+    watchScanViaWS(scanId, onProgress) {
+        return new Promise((resolve, reject) => {
+            let ws = null;
+            let polling = false;
+            let pollingTimer = null;
+
+            const startPolling = () => {
+                polling = true;
+                const poll = async () => {
+                    try {
+                        while (polling) {
+                            const status = await this.getStatus(scanId);
+                            if (onProgress) onProgress(status);
+                            if (status.status === 'completed') return resolve(status);
+                            if (status.status === 'failed') return reject(new Error(status.error || 'Scan failed'));
+                            await Utils.sleep(this.POLL_INTERVAL);
+                        }
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                poll();
+            };
+
+            try {
+                ws = new WebSocket(`${this.WS_BASE}/api/ws/scan/${scanId}`);
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'pong') return;
+                        if (onProgress) onProgress(data);
+                        if (data.status === 'completed') {
+                            ws.close();
+                            return resolve(data);
+                        }
+                        if (data.status === 'failed') {
+                            ws.close();
+                            return reject(new Error(data.message || 'Scan failed'));
+                        }
+                    } catch (e) {
+                        console.warn('WS parse error, falling back to polling', e);
+                        if (ws) ws.close();
+                        startPolling();
+                    }
+                };
+
+                ws.onerror = () => {
+                    console.warn('WebSocket error, falling back to polling');
+                    if (ws) ws.close();
+                    startPolling();
+                };
+
+                ws.onclose = () => {
+                    if (!polling) startPolling();
+                };
+
+                // Keepalive ping every 10s
+                const keepalive = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send('ping');
+                    } else {
+                        clearInterval(keepalive);
+                    }
+                }, 10000);
+
+            } catch (e) {
+                console.warn('WebSocket not available, using polling', e);
+                startPolling();
+            }
+        });
+    },
+
+    /**
      * Compare two scans
      * @param {string} scanId1 - First scan ID
      * @param {string} scanId2 - Second scan ID
@@ -155,8 +235,13 @@ const API = {
         const scanResponse = await this.startScan(domain, enableNetworkScan);
         const scanId = scanResponse.scan_id;
 
-        // Poll until complete
-        await this.pollUntilComplete(scanId, onProgress);
+        try {
+            // Try WebSocket first, fallback to polling
+            await this.watchScanViaWS(scanId, onProgress);
+        } catch (err) {
+            // If WebSocket fails, use polling
+            await this.pollUntilComplete(scanId, onProgress);
+        }
 
         // Fetch results and dashboard in parallel
         const [results, dashboard] = await Promise.all([

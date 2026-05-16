@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional
 
 from models import Asset, ChangedAsset, ScanComparison, ScanResult, ScanStatus, Recommendation, RiskLevel
+from services.ws_manager import get_ws_manager
 from storage import get_database
 from discovery import get_discovery, get_dns_analyzer
 from analysis import get_risk_engine, get_ssl_analyzer
@@ -91,6 +92,7 @@ class ScanService:
             if enable_network_scan:
                 logger.info("[%s] Network scanning enabled", scan_id)
             await self._update_status(scan_id, ScanStatus.SCANNING)
+            await self._broadcast_status(scan_id, ScanStatus.SCANNING, 20)
             
             # Add small delay for realistic demo feel
             await asyncio.sleep(1)
@@ -106,6 +108,7 @@ class ScanService:
             # ======= PHASE 2: ANALYZING =======
             logger.info("[%s] Analyzing risks", scan_id)
             await self._update_status(scan_id, ScanStatus.ANALYZING)
+            await self._broadcast_status(scan_id, ScanStatus.ANALYZING, 60)
             
             await asyncio.sleep(0.5)
             
@@ -190,10 +193,12 @@ class ScanService:
             scan.completed_at = datetime.utcnow()
             
             await self.db.save_scan(scan)
+            await self._broadcast_status(scan_id, ScanStatus.COMPLETED, 100)
             logger.info("[%s] Scan completed successfully", scan_id)
             
         except Exception as e:
             logger.error("[%s] Scan failed: %s", scan_id, e)
+            await self._broadcast_status(scan_id, ScanStatus.FAILED, 100)
             await self._update_status(
                 scan_id, 
                 ScanStatus.FAILED, 
@@ -307,6 +312,24 @@ class ScanService:
             total_changed=len(changed_assets)
         )
     
+    async def _broadcast_status(self, scan_id: str, status: ScanStatus, progress: int):
+        """Push scan status update to WebSocket clients."""
+        try:
+            messages = {
+                ScanStatus.PENDING: "Initializing scan...",
+                ScanStatus.SCANNING: "Discovering assets...",
+                ScanStatus.ANALYZING: "Analyzing risks and generating recommendations...",
+                ScanStatus.COMPLETED: "Scan complete",
+                ScanStatus.FAILED: "Scan failed"
+            }
+            await get_ws_manager().broadcast(scan_id, {
+                "status": status.value,
+                "progress": progress,
+                "message": messages.get(status, "Unknown")
+            })
+        except Exception:
+            pass
+
     async def _update_status(
         self, 
         scan_id: str, 
