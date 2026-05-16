@@ -14,6 +14,9 @@ const App = {
 
     // DOM elements cache
     elements: {},
+    
+    // Share link
+    _currentShareToken: null,
 
     /**
      * Initialize application
@@ -25,8 +28,14 @@ const App = {
         // Bind event handlers
         this.bindEvents();
         
-        // Show initial state
-        this.showEmptyState();
+        // Check if loaded via shared link
+        const urlParams = new URLSearchParams(window.location.search);
+        const sharedToken = urlParams.get('shared');
+        if (sharedToken) {
+            this.loadSharedDashboard(sharedToken);
+        } else {
+            this.showEmptyState();
+        }
         
         console.log('Shadow IT Discovery Bot initialized');
     },
@@ -53,6 +62,7 @@ const App = {
             noAssets: document.getElementById('no-assets'),
             recommendationsContainer: document.getElementById('recommendations-container'),
             noRecommendations: document.getElementById('no-recommendations'),
+            shareButton: document.getElementById('share-button'),
             riskFilter: document.getElementById('risk-filter'),
             statTotal: document.getElementById('stat-total'),
             statCritical: document.getElementById('stat-critical'),
@@ -74,6 +84,11 @@ const App = {
         // Retry button
         this.elements.retryButton.addEventListener('click', () => {
             this.showEmptyState();
+        });
+
+        // Share button
+        this.elements.shareButton.addEventListener('click', () => {
+            this.generateShareLink();
         });
 
         // Risk filter
@@ -245,11 +260,61 @@ const App = {
     },
 
     /**
+     * Generate share link for current scan
+     */
+    async generateShareLink() {
+        if (!this.state.currentScanId) return;
+        try {
+            const response = await fetch(`${API.BASE_URL}/share/${this.state.currentScanId}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            const shareUrl = `${window.location.origin}${window.location.pathname}?shared=${data.token}`;
+            await navigator.clipboard.writeText(shareUrl);
+            alert('Share link copied to clipboard!');
+        } catch (e) {
+            prompt('Copy this share link:', `${window.location.origin}${window.location.pathname}?shared=DEMO`);
+        }
+    },
+
+    /**
+     * Load a shared dashboard from a share token
+     */
+    async loadSharedDashboard(token) {
+        try {
+            this.showProgress();
+            this.updateProgress({ status: 'scanning', progress: 50 });
+
+            const response = await fetch(`${API.BASE_URL}/shared/${token}`);
+            if (!response.ok) throw new Error('Share link invalid');
+            const dashboard = await response.json();
+
+            this.state.dashboard = dashboard;
+            this.state.currentScanId = dashboard.scan_id;
+
+            // Build a mock results object from dashboard data
+            this.state.results = {
+                assets: dashboard.highest_risks,
+                recommendations: dashboard.top_recommendations,
+                posture_score: dashboard.posture_score
+            };
+
+            this.renderDashboard();
+            this.showDashboard();
+        } catch (e) {
+            this.showError('Invalid or expired share link');
+        }
+    },
+
+    /**
      * Render dashboard with results
      */
     renderDashboard() {
         const { results, dashboard } = this.state;
         const assets = results?.assets || [];
+
+        // Show share button
+        this.elements.shareButton.classList.remove('hidden');
 
         // Update stats
         const riskCounts = Utils.countByRisk(assets);

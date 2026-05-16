@@ -7,6 +7,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, 
 from typing import List
 
 from config import get_settings
+import uuid
+from datetime import datetime
+
 from models import (
     ScanRequest,
     ScanResponse,
@@ -15,10 +18,12 @@ from models import (
     DashboardSummary,
     ScanComparison,
     ScanStatus,
+    ShareLink,
     Asset,
     Recommendation
 )
 from services import get_scan_service
+from storage import get_database
 from utils.rate_limiter import get_rate_limiter
 
 router = APIRouter(prefix="/api", tags=["Scans"], dependencies=[Depends(check_rate_limit)])
@@ -362,3 +367,81 @@ async def compare_scans(scan_id_1: str, scan_id_2: str):
         )
     
     return comparison
+
+
+# ============== SHARE ENDPOINTS ==============
+
+@router.post(
+    "/share/{scan_id}",
+    summary="Generate Share Link",
+    description="Create a shareable link to a scan dashboard."
+)
+async def generate_share_link(scan_id: str):
+    """
+    Generate a unique shareable link for a scan.
+    
+    Returns a token that can be used to access scan results
+    without authentication (useful for sharing reports).
+    """
+    service = get_scan_service()
+    scan = await service.get_scan(scan_id)
+    
+    if not scan:
+        raise HTTPException(status_code=404, detail=f"Scan {scan_id} not found")
+    if scan.status != ScanStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Scan not yet completed")
+    
+    token = uuid.uuid4().hex[:16]
+    link = ShareLink(
+        token=token,
+        scan_id=scan_id,
+        created_at=datetime.utcnow()
+    )
+    
+    db = get_database()
+    await db.save_share_link(link)
+    
+    return {
+        "token": token,
+        "scan_id": scan_id,
+        "url": f"/shared/{token}"
+    }
+
+
+@router.get(
+    "/shared/{token}",
+    response_model=DashboardSummary,
+    summary="View Shared Dashboard",
+    description="Access a scan dashboard via a share token."
+)
+async def view_shared_dashboard(token: str):
+    """
+    View scan results via a share token.
+    
+    This provides public access to scan results
+    without requiring a scan ID.
+    """
+    db = get_database()
+    link = await db.get_share_link(token)
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Share link not found or expired")
+    
+    service = get_scan_service()
+    scan = await service.get_scan(link.scan_id)
+    
+    if not scan or scan.status != ScanStatus.COMPLETED:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    
+    sorted_assets = sorted(scan.assets, key=lambda a: a.risk_score, reverse=True)
+    
+    return DashboardSummary(
+        scan_id=scan.scan_id,
+        domain=scan.domain,
+        total_assets=len(scan.assets),
+        severity_distribution=scan.posture_score.risk_distribution if scan.posture_score else {},
+        highest_risks=sorted_assets[:5],
+        posture_score=scan.posture_score,
+        top_recommendations=scan.recommendations[:5],
+        scan_timestamp=scan.started_at
+    )

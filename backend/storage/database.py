@@ -14,7 +14,7 @@ from typing import Optional, List, Dict
 from pathlib import Path
 
 from config import get_settings
-from models import ScanResult, ScanStatus
+from models import ScanResult, ScanStatus, ShareLink
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +182,39 @@ class ScanDatabase:
         """Check if a scan exists."""
         return self._get_scan_path(scan_id).exists()
     
+    async def save_share_link(self, link: ShareLink) -> bool:
+        """Save a share link mapping."""
+        try:
+            path = self.scans_dir / "_shares.json"
+            shares = {}
+            if path.exists():
+                async with aiofiles.open(path, 'r') as f:
+                    content = await f.read()
+                    shares = json.loads(content)
+            shares[link.token] = link.model_dump(mode='json')
+            async with aiofiles.open(path, 'w') as f:
+                await f.write(json.dumps(shares, indent=2))
+            return True
+        except Exception as e:
+            logger.error("Error saving share link: %s", e)
+            return False
+
+    async def get_share_link(self, token: str) -> Optional[ShareLink]:
+        """Retrieve a share link by token."""
+        try:
+            path = self.scans_dir / "_shares.json"
+            if not path.exists():
+                return None
+            async with aiofiles.open(path, 'r') as f:
+                content = await f.read()
+                shares = json.loads(content)
+            data = shares.get(token)
+            if data:
+                return ShareLink(**data)
+        except Exception as e:
+            logger.error("Error reading share link: %s", e)
+        return None
+
     def cleanup_old_scans(self) -> int:
         """
         Delete scan files older than retention period.

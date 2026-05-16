@@ -220,6 +220,13 @@ class ScanComparison(BaseModel):
     total_changed: int = 0
 
 
+class ShareLink(BaseModel):
+    """A shareable link to a scan dashboard."""
+    token: str = Field(..., description="Unique share token")
+    scan_id: str = Field(..., description="Linked scan ID")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class DashboardSummary(BaseModel):
     """Aggregated dashboard data for visualization."""
     scan_id: str
