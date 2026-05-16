@@ -282,3 +282,65 @@ input:focus, select:focus {
 canvas {
     max-width: 100%;
 }
+
+/* ============== Mobile Responsive ============== */
+
+@media (max-width: 639px) {
+    /* Stack feature icons vertically */
+    .container .gap-8 {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    /* Make stats grid single column */
+    .gap-4.grid-cols-2 {
+        grid-template-columns: 1fr;
+    }
+
+    /* Responsive assets table - convert to cards */
+    #assets-table-body tr {
+        display: block;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        background: rgba(17, 24, 39, 0.6);
+        border: 1px solid #1f2937;
+        border-radius: 0.5rem;
+    }
+
+    #assets-table-body td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.35rem 0;
+        border: none;
+        gap: 0.5rem;
+    }
+
+    #assets-table-body td::before {
+        content: attr(data-label);
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        color: #6b7280;
+        flex-shrink: 0;
+    }
+
+    #assets-table-body td .risk-badge {
+        margin-left: auto;
+    }
+
+    thead {
+        display: none;
+    }
+
+    .overflow-x-auto {
+        overflow: visible;
+    }
+}
+
+@media (max-width: 767px) {
+    /* Stack stats row */
+    .grid-cols-1.md\:grid-cols-3 {
+        grid-template-columns: 1fr;
+    }
+}

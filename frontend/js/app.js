@@ -285,25 +285,25 @@ const App = {
 
         const rows = assets.map(asset => `
             <tr class="fade-in">
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3 whitespace-nowrap" data-label="Asset ID">
                     <span class="text-sm font-mono text-gray-300">${Utils.escapeHtml(Utils.truncate(asset.asset_id, 20))}</span>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3 whitespace-nowrap" data-label="IP Address">
                     <span class="text-sm text-white">${Utils.escapeHtml(asset.ip || '--')}</span>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3 whitespace-nowrap" data-label="Port">
                     <span class="text-sm text-gray-400">${asset.port || '--'}</span>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3 whitespace-nowrap" data-label="Service">
                     <span class="text-sm text-gray-300">${Utils.escapeHtml(asset.service || '--')}</span>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3 whitespace-nowrap" data-label="Technology">
                     <span class="text-sm text-gray-300">${Utils.escapeHtml(Utils.truncate(asset.technology, 25))}</span>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3 whitespace-nowrap" data-label="Risk Level">
                     <span class="risk-badge ${Utils.getRiskClass(asset.risk_level)}">${Utils.escapeHtml(asset.risk_level || 'Unknown')}</span>
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3 whitespace-nowrap" data-label="Score">
                     <span class="text-sm font-medium ${asset.risk_score >= 70 ? 'text-red-400' : asset.risk_score >= 40 ? 'text-yellow-400' : 'text-green-400'}">
                         ${asset.risk_score || 0}
                     </span>
